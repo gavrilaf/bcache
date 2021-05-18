@@ -1,11 +1,10 @@
 package bcache
 
 import (
-	"time"
-
 	"github.com/allegro/bigcache/v3"
 	"github.com/dgraph-io/ristretto"
 	lru "github.com/hashicorp/golang-lru"
+	"time"
 )
 
 type LocalCache interface {
@@ -81,7 +80,11 @@ type BigCacheCache struct {
 }
 
 func NewBigCacheCache() LocalCache {
-	cache, _ := bigcache.NewBigCache(bigcache.DefaultConfig(10 * time.Minute))
+	cfg := bigcache.DefaultConfig(10 * time.Minute)
+	cfg.Verbose = false
+	cfg.Shards = 64
+
+	cache, _ := bigcache.NewBigCache(cfg)
 	return &BigCacheCache{cache: cache}
 }
 

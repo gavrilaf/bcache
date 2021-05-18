@@ -3,7 +3,6 @@ package bcache_test
 import (
 	"math/rand"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -56,20 +55,12 @@ func BenchmarkLocalCache(b *testing.B) {
 
 	for _, bb := range benchmarks {
 		b.Run(bb.name, func(b *testing.B) {
-			wg := sync.WaitGroup{}
-			for i := 0; i < 10; i++ {
-				wg.Add(1)
-				go func() {
-					for i := 0; i < 10000; i++ {
-						key1, key2 := rand.Intn(1000), rand.Intn(1000)
+			for i := 0; i < b.N; i++ {
+				key1, key2 := rand.Intn(1000), rand.Intn(1000)
 
-						bb.cache.Set(strconv.Itoa(key1), []byte("123"))
-						bb.cache.Get(strconv.Itoa(key2))
-					}
-					wg.Done()
-				}()
+				bb.cache.Set(strconv.Itoa(key1), []byte("123"))
+				bb.cache.Get(strconv.Itoa(key2))
 			}
-			wg.Wait()
 		})
 	}
 }

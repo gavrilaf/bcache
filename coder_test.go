@@ -1,7 +1,6 @@
 package bcache_test
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,20 +97,12 @@ func BenchmarkCoder(b *testing.B) {
 
 	for _, bb := range benchmarks {
 		b.Run(bb.name, func(b *testing.B) {
-			wg := sync.WaitGroup{}
-			for i := 0; i < 5; i++ {
-				wg.Add(1)
-				go func() {
-					for j := 0; j < 10000; j++ {
-						buf, _ := bb.coder.Encode(obj)
+			for i := 0; i < b.N; i++ {
+				buf, _ := bb.coder.Encode(obj)
 
-						var decoded TestType
-						_ = bb.coder.Decode(buf, &decoded)
-					}
-					wg.Done()
-				}()
+				var decoded TestType
+				_ = bb.coder.Decode(buf, &decoded)
 			}
-			wg.Wait()
 		})
 	}
 }

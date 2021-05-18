@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -178,26 +177,16 @@ func BenchmarkBCache(b *testing.B) {
 
 	for _, bb := range benchmarks {
 		b.Run(bb.name, func(b *testing.B) {
-			wg := sync.WaitGroup{}
-			for i := 0; i < 10; i++ {
-				wg.Add(1)
-				go func() {
-					for i := 0; i < 1000; i++ {
-						key1 := rand.Intn(100)
+			for i := 0; i < b.N; i++ {
+				key1 := rand.Intn(100)
+				_ = bb.cache.Set(context.TODO(), strconv.Itoa(key1), obj)
 
-						_ = bb.cache.Set(context.TODO(), strconv.Itoa(key1), obj)
 
-						for j := 0; j < 10; j++ {
-							key2 := rand.Intn(100)
+				key2 := rand.Intn(10)
 
-							var cached TestType
-							_ = bb.cache.Get(context.TODO(), strconv.Itoa(key2), &cached)
-						}
-					}
-					wg.Done()
-				}()
+				var cached TestType
+				_ = bb.cache.Get(context.TODO(), strconv.Itoa(key2), &cached)
 			}
-			wg.Wait()
 		})
 	}
 }
