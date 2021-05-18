@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -190,3 +191,130 @@ func BenchmarkBCache(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkBCacheParallel(b *testing.B) {
+	redisMock, err := miniredis.Run()
+	if err != nil {
+		panic(err)
+	}
+
+	defer redisMock.Close()
+
+	redisClient := redis.NewClient(&redis.Options{
+		Network: "tcp",
+		Addr:    redisMock.Addr(),
+	})
+	defer redisClient.Close()
+
+	remote := &bcache.RedisCache{
+		TTL:    time.Minute * 10,
+		Client: redisClient,
+	}
+
+	benchmarks := []struct {
+		name  string
+		cache bcache.Client
+	}{
+		{
+			name: "lru + msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.VanillaMsgPackCoder{},
+				Local:  bcache.NewSimpleLRUCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "lru + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewSimpleLRUCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "bigcache + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewBigCacheCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "bigcache + msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.VanillaMsgPackCoder{},
+				Local:  bcache.NewBigCacheCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "ristretto + json",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.JsonCoder{},
+				Local:  bcache.NewRistrettoCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "ristretto + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewRistrettoCache(),
+				Remote: remote,
+			}),
+		},
+	}
+
+	obj := TestType{
+		I:  123,
+		S:  "test",
+		A:  []int{2, 3, 4},
+		M:  map[string]string{"1": "2"},
+		SS: TestTypeInternal{II: 897},
+	}
+
+	for _, bb := range benchmarks {
+		b.Run(bb.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				wg := &sync.WaitGroup{}
+
+				wg.Add(1)
+				go func() {
+					_ = bb.cache.Set(context.TODO(), strconv.Itoa(rand.Intn(100)), obj)
+					_ = bb.cache.Set(context.TODO(), strconv.Itoa(rand.Intn(100)), obj)
+					_ = bb.cache.Set(context.TODO(), strconv.Itoa(rand.Intn(100)), obj)
+					wg.Done()
+				}()
+
+				wg.Add(1)
+				go func() {
+					var cached TestType
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					wg.Done()
+				}()
+
+				wg.Add(1)
+				go func() {
+					var cached TestType
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					wg.Done()
+				}()
+
+				wg.Add(1)
+				go func() {
+					_ = bb.cache.Set(context.TODO(), strconv.Itoa(rand.Intn(100)), obj)
+					var cached TestType
+					_ = bb.cache.Get(context.TODO(), strconv.Itoa(rand.Intn(10)), &cached)
+					wg.Done()
+				}()
+
+				wg.Wait()
+			}
+		})
+	}
+}
+
