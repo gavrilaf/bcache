@@ -1,10 +1,14 @@
 package bcache
 
 import (
+	"time"
+	"unsafe"
+
 	"github.com/allegro/bigcache/v3"
 	"github.com/dgraph-io/ristretto"
 	lru "github.com/hashicorp/golang-lru"
-	"time"
+	"github.com/coocood/freecache"
+	"github.com/gavrilaf/ccache"
 )
 
 type LocalCache interface {
@@ -82,7 +86,7 @@ type BigCacheCache struct {
 func NewBigCacheCache() LocalCache {
 	cfg := bigcache.DefaultConfig(10 * time.Minute)
 	cfg.Verbose = false
-	cfg.Shards = 64
+	cfg.Shards = 16
 
 	cache, _ := bigcache.NewBigCache(cfg)
 	return &BigCacheCache{cache: cache}
@@ -100,3 +104,61 @@ func (c *BigCacheCache) Set(key string, value []byte) {
 func (c *BigCacheCache) Remove(key string) {
 	c.cache.Delete(key)
 }
+
+
+// freecache
+
+type FreeCacheCache struct {
+	cache *freecache.Cache
+}
+
+func NewFreeCacheCache() LocalCache {
+	cache := freecache.NewCache(512 * 1024)
+	return &FreeCacheCache{cache: cache}
+}
+
+func (c *FreeCacheCache) Get(key string) ([]byte, bool) {
+	bk := *(*[]byte)(unsafe.Pointer(&key))
+
+	v, err := c.cache.Get(bk)
+	return v, err == nil
+}
+
+func (c *FreeCacheCache) Set(key string, value []byte) {
+	bk := *(*[]byte)(unsafe.Pointer(&key))
+
+	c.cache.Set(bk, value, -1)
+}
+
+func (c *FreeCacheCache) Remove(key string) {
+	c.cache.Del([]byte(key))
+}
+
+// CCache
+
+type CCacheCache struct {
+	cache *ccache.Cache
+}
+
+func NewCCacheCache() LocalCache {
+	cache := ccache.NewCache(1000)
+	return &CCacheCache{cache: cache}
+}
+
+func (c *CCacheCache) Get(key string) ([]byte, bool) {
+	v, ok := c.cache.Get(key)
+	if !ok {
+		return nil, false
+	}
+
+	return v.([]byte), true
+}
+
+func (c *CCacheCache) Set(key string, value []byte) {
+	c.cache.Set(key, value, 0)
+}
+
+func (c *CCacheCache) Remove(key string) {
+	//c.cache.
+}
+

@@ -118,14 +118,14 @@ func BenchmarkBCache(b *testing.B) {
 		name  string
 		cache bcache.Client
 	}{
-		{
+		/*{
 			name: "lru + msg pack",
 			cache: bcache.NewClient(bcache.Config{
 				Coder:  bcache.VanillaMsgPackCoder{},
 				Local:  bcache.NewSimpleLRUCache(),
 				Remote: remote,
 			}),
-		},
+		},*/
 		{
 			name: "lru + buffered msg pack",
 			cache: bcache.NewClient(bcache.Config{
@@ -142,27 +142,35 @@ func BenchmarkBCache(b *testing.B) {
 				Remote: remote,
 			}),
 		},
-		{
+		/*{
 			name: "bigcache + msg pack",
 			cache: bcache.NewClient(bcache.Config{
 				Coder:  bcache.VanillaMsgPackCoder{},
 				Local:  bcache.NewBigCacheCache(),
 				Remote: remote,
 			}),
-		},
-		{
+		},*/
+		/*{
 			name: "ristretto + json",
 			cache: bcache.NewClient(bcache.Config{
 				Coder:  bcache.JsonCoder{},
 				Local:  bcache.NewRistrettoCache(),
 				Remote: remote,
 			}),
-		},
+		},*/
 		{
 			name: "ristretto + buffered msg pack",
 			cache: bcache.NewClient(bcache.Config{
 				Coder:  bcache.NewBufferedMsgPackCoder(),
 				Local:  bcache.NewRistrettoCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "freecache + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewFreeCacheCache(),
 				Remote: remote,
 			}),
 		},
@@ -263,6 +271,23 @@ func BenchmarkBCacheParallel(b *testing.B) {
 				Remote: remote,
 			}),
 		},
+		{
+			name: "freecache + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewFreeCacheCache(),
+				Remote: remote,
+			}),
+		},
+		{
+			name: "ccache + buffered msg pack",
+			cache: bcache.NewClient(bcache.Config{
+				Coder:  bcache.NewBufferedMsgPackCoder(),
+				Local:  bcache.NewCCacheCache(),
+				Remote: remote,
+			}),
+		},
+
 	}
 
 	obj := TestType{
@@ -275,6 +300,8 @@ func BenchmarkBCacheParallel(b *testing.B) {
 
 	for _, bb := range benchmarks {
 		b.Run(bb.name, func(b *testing.B) {
+			b.ReportAllocs()
+
 			for i := 0; i < b.N; i++ {
 				wg := &sync.WaitGroup{}
 

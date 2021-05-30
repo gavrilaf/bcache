@@ -19,6 +19,8 @@ func TestLocalCache(t *testing.T) {
 		{"ristretto", bcache.NewRistrettoCache()},
 		{"simple lru", bcache.NewSimpleLRUCache()},
 		{"bigcache", bcache.NewBigCacheCache()},
+		{"freecache", bcache.NewFreeCacheCache()},
+		{"ccache", bcache.NewCCacheCache()},
 	}
 
 	for _, tt := range tests {
@@ -51,6 +53,8 @@ func BenchmarkLocalCache(b *testing.B) {
 		{"ristretto", bcache.NewRistrettoCache()},
 		{"simple lru", bcache.NewSimpleLRUCache()},
 		{"bigcache", bcache.NewBigCacheCache()},
+		{"freecache", bcache.NewFreeCacheCache()},
+		{"ccache", bcache.NewCCacheCache()},
 	}
 
 	for _, bb := range benchmarks {
